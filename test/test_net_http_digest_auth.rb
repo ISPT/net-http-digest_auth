@@ -1,115 +1,114 @@
-require 'minitest/autorun'
-require 'net/http/digest_auth'
+require "minitest/autorun"
+require "net/http/digest_auth"
 
 class TestNetHttpDigestAuth < Minitest::Test
-
   def setup
     @uri = URI.parse "http://www.example.com/"
-    @uri.user = 'user'
-    @uri.password = 'password'
+    @uri.user = "user"
+    @uri.password = "password"
 
-    @cnonce = '9ea5ff3bd34554a4165bbdc1df91dcff'
+    @cnonce = "9ea5ff3bd34554a4165bbdc1df91dcff"
 
     @header = [
       'Digest qop="auth"',
       'realm="www.example.com"',
-      'nonce="4107baa081a592a6021660200000cd6c5686ff5f579324402b374d83e2c9"'
-    ].join ', '
+      'nonce="4107baa081a592a6021660200000cd6c5686ff5f579324402b374d83e2c9"',
+    ].join ", "
 
     @expected = [
       'Digest username="user"',
       'realm="www.example.com"',
-      'algorithm=MD5',
-      'qop=auth',
+      "algorithm=MD5",
+      "qop=auth",
       'uri="/"',
       'nonce="4107baa081a592a6021660200000cd6c5686ff5f579324402b374d83e2c9"',
-      'nc=00000000',
+      "nc=00000001",
       'cnonce="9ea5ff3bd34554a4165bbdc1df91dcff"',
-      'response="67be92a5e7b38d08679957db04f5da04"'
+      'response="1f5f0cd1588690c1303737f081c0b9bb"',
     ]
 
     @da = Net::HTTP::DigestAuth.new
 
     def @da.make_cnonce
-      '9ea5ff3bd34554a4165bbdc1df91dcff'
+      "9ea5ff3bd34554a4165bbdc1df91dcff"
     end
   end
 
   def expected
-    @expected.join ', '
+    @expected.join ", "
   end
 
   def test_auth_header
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
 
-    @expected[6] = 'nc=00000001'
-    @expected[8] = 'response="1f5f0cd1588690c1303737f081c0b9bb"'
+    @expected[6] = "nc=00000002"
+    @expected[8] = 'response="87b2331cd957b9808b7adb3b7e94f1e0"'
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
   end
 
   def test_auth_header_iis
     @expected[3] = 'qop="auth"'
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET', true)
+    assert_equal expected, @da.auth_header(@uri, @header, "GET", true)
   end
 
   def test_auth_header_no_qop
-    @header.sub! ' qop="auth",', ''
+    @header.sub! ' qop="auth",', ""
 
     @expected[8] = 'response="32f6ca1631ccf7c42a8075deff44e470"'
-    @expected.delete 'qop=auth'
+    @expected.delete "qop=auth"
     @expected.delete 'cnonce="9ea5ff3bd34554a4165bbdc1df91dcff"'
-    @expected.delete 'nc=00000000'
+    @expected.delete "nc=00000001"
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
   end
 
   def test_auth_header_opaque
     @expected << 'opaque="5ccc069c403ebaf9f0171e9517f40e41"'
-    @header   << 'opaque="5ccc069c403ebaf9f0171e9517f40e41"'
+    @header << 'opaque="5ccc069c403ebaf9f0171e9517f40e41"'
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
   end
 
   def test_auth_header_post
-    @expected[8] = 'response="d82219e1e5430b136bbae1670fa51d48"'
+    @expected[8] = 'response="ac8b098bbcc6ac9ab5a67f68d4fc63b6"'
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'POST')
+    assert_equal expected, @da.auth_header(@uri, @header, "POST")
   end
 
   def test_auth_header_sess
-    @header << ', algorithm=MD5-sess'
+    @header << ", algorithm=MD5-sess"
 
-    @expected[2] = 'algorithm=MD5-sess'
-    @expected[8] = 'response="c22c5bd9112a86ca78ddc1ae772daeeb"'
+    @expected[2] = "algorithm=MD5-sess"
+    @expected[8] = 'response="00f9b983fa8e9b7bfbec1d8954a1b7ff"'
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
   end
 
   def test_auth_header_sha1
-    @expected[2] = 'algorithm=SHA1'
-    @expected[8] = 'response="2cb62fc18f7b0ebdc34543f896bb77686b4115e4"'
+    @expected[2] = "algorithm=SHA1"
+    @expected[8] = 'response="84ce3d3d0093369e99fec4b18727b070c089ab98"'
 
-    @header << 'algorithm=SHA1'
+    @header << "algorithm=SHA1"
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
   end
 
   def test_auth_header_unknown_algorithm
-    @header << 'algorithm=bogus'
+    @header << "algorithm=bogus"
 
     e = assert_raises Net::HTTP::DigestAuth::Error do
-      @da.auth_header @uri, @header, 'GET'
+      @da.auth_header @uri, @header, "GET"
     end
-    
+
     assert_equal 'unknown algorithm "bogus"', e.message
   end
 
   def test_auth_header_quoted_algorithm
     @header << 'algorithm="MD5"'
 
-    assert_equal expected, @da.auth_header(@uri, @header, 'GET')
+    assert_equal expected, @da.auth_header(@uri, @header, "GET")
   end
 
   def test_make_cnonce
@@ -125,6 +124,4 @@ class TestNetHttpDigestAuth < Minitest::Test
 
     assert_equal first + 1, @da.next_nonce
   end
-
 end
-
